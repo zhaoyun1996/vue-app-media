@@ -1,9 +1,6 @@
 {
     "version": 2,
     "name": "vue-app-media",
-    "builds": [
-      { "use": "@vercel/node" }
-    ],
     "routes": [
       { "src": "/(.*)", "dest": "/server.js" }
     ]
