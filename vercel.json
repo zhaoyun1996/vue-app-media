@@ -1,7 +1,0 @@
-{
-    "version": 2,
-    "name": "vue-app-media",
-    "routes": [
-      { "src": "/(.*)", "dest": "/server.js" }
-    ]
-  }
