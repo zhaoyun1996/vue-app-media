@@ -84,8 +84,8 @@ app.get('/getArtist', async (req, res) => {
  * Get Lyric Song
  */
 app.get('/getLyric', async (req, res) => {
-	var data = await ZingMp3.getLyric("ZOACFBBU");
-	res.status(200).send(data)
+	var data = await ZingMp3.getLyric(req.query.id);
+	res.send(data)
 })
 
 /**

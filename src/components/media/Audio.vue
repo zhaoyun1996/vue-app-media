@@ -9,9 +9,10 @@
                 autocomplete="off"
             />
         </div>
+        <div class="content-left">{{ word }}</div>
         <div class="player">
             <div class="dashboard">
-                <div class="header">
+                <div class="header" v-if="idSongActived">
                     <h4>Now playing:</h4>
                     <h2 id="title">{{ title }}</h2>
                 </div>
@@ -70,6 +71,9 @@
                     <div>{{ totalTime }}</div>
                 </div>
 
+                <!-- <div class="lyric">{{ lyric }}</div> -->
+                <div class="lyric" v-html="lyric"></div>
+
                 <audio id="audio-control" controls v-show="false">
                     <source type="audio/mpeg" />
                 </audio>
@@ -100,17 +104,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- <div id="list-song">
-            <ul v-for="(item, index) in songs" :key="index">
-                <li
-                    :id="item.encodeId"
-                    :style="item.encodeId == idSongActived ? 'color: red' : ''"
-                >
-                    {{ item.title }}
-                </li>
-            </ul>
-        </div> -->
     </div>
 </template>
 <script>
@@ -132,6 +125,14 @@ export default {
             isRandom: false,
             currentTime: "00:00",
             totalTime: "00:00",
+            sentences: {
+                old: [],
+                new: []
+            },
+            lyric: "",
+            timeStart: 0,
+            word: "",
+            rowLyric: 0
         };
     },
     methods: {
@@ -144,7 +145,6 @@ export default {
 
             let res = await axios.get(`/getSong?id=${id}`);
 
-            console.log(res.data.data);
             me.audioControl.src = res.data.data[128];
         },
 
@@ -246,13 +246,27 @@ export default {
          * Thực hiện lấy lời bài hát
          * Get Lyric Song
          */
-        async getLyric() {
-            // const me = this;
+        async getLyric(id) {
+            const me = this;
 
-            let res = await axios.get("/getLyric");
-            // audio = document.getElementById("audio");
+            let res = await axios.get(`/getLyric?id=${id}`);
 
-            console.log(res);
+            if (res && res.data && res.data.msg == "Success" && res.data.data) {
+                me.sentences.old = res.data.data.sentences;
+                me.sentences.new = [];
+                me.lyric = '';
+                me.rowLyric = 0;
+
+                if(Array.isArray(me.sentences.old)) {
+                    me.sentences.old.forEach(item => {
+                        me.sentences.new.push({
+                            startTime: item.words[0].startTime,
+                            endTime: item.words[item.words.length - 1].endTime,
+                            data: item.words.map((x, index) => `<span id="word-${index}">${x.data}</span>`).join(" ")
+                        });
+                    })
+                }
+            }
         },
 
         /**
@@ -326,7 +340,9 @@ export default {
             me.audioControl.onplay = () => {
                 songInterval = setInterval(() => {
                     me.currentTime = me.convertTime(parseInt(me.audioControl.currentTime, 10));
-                }, 1000);
+
+                    me.runLyric();
+                }, 100);
             };
 
             // Khi nhạc dừng lại
@@ -395,6 +411,8 @@ export default {
             me.setSong(me.idSongActived);
 
             await me.getSong(me.idSongActived);
+
+            me.getLyric(me.idSongActived);
 
             me.scrollToActiveSong();
 
@@ -558,6 +576,46 @@ export default {
                 });
             }, 300);
         },
+
+        /**
+         * Chạy lời bài hát
+         */
+        runLyric() {
+            const me = this;
+
+            if(Array.isArray(me.sentences.old)) {
+                // Xử lý lời ở cd
+                for(let i = me.rowLyric; i < me.sentences.new.length; i++) {
+                    let sentence = me.sentences.new[i];
+                    let timeLyric = me.audioControl.currentTime * 1000;
+                    if(timeLyric >= sentence.startTime && timeLyric <= sentence.endTime) {
+                        me.lyric = sentence.data;
+                        me.rowLyric = i;
+                        break;
+                    }
+                }
+
+                // Xử lý lời ở bên trái
+                let sentence = me.sentences.old[me.rowLyric];
+                if(sentence && Array.isArray(sentence.words)) {
+                    for(let y = 0; y < sentence.words.length; y++) {
+                        let timeLyric = me.audioControl.currentTime * 1000;
+                        let word = sentence.words[y];
+    
+                        // Sửa lại style
+                        let text = document.getElementById(`word-${y}`);
+                        if(text && timeLyric >= word.startTime) {
+                            text.style.color = "red";
+                        }
+    
+                        if(timeLyric >= word.startTime && timeLyric <= word.endTime) {
+                            me.word = word.data;
+                            return;
+                        }
+                    }
+                }
+            }
+        }
     },
 
     mounted() {
@@ -717,7 +775,7 @@ export default {
 
 /* PLAYLIST */
 .playlist {
-    margin-top: 502px;
+    margin-top: 530px;
     padding: 12px;
 }
 
@@ -772,5 +830,10 @@ export default {
     padding: 16px 8px;
     color: #999;
     font-size: 18px;
+}
+
+.lyric {
+    margin-top: 10px;
+    text-align: center;
 }
 </style>
