@@ -1,19 +1,29 @@
 <template lang="">
+    <div class="overlay"></div>
     <div id="audio">
         <div id="search-song">
             <input
+                ref="inputSearch"
                 v-model="searchValue"
                 @keyup.enter="search"
                 id="search-value"
                 placeholder="Nhập từ khóa để tìm kiếm bài hát"
                 autocomplete="off"
             />
+            <!-- <button @click="getChartHome">Get Chart Home</button> -->
         </div>
-        <div class="content-left">{{ word }}</div>
+        <div class="lyric-left" v-if="sentences && sentences.new">
+            <div
+                v-for="(item, index) in sentences.new"
+                class="lyric-left-item"
+                :key="idSongActived + index"
+            >
+                {{ item.dataSource }}
+            </div>
+        </div>
         <div class="player">
             <div class="dashboard">
                 <div class="header" v-if="idSongActived">
-                    <h4>Now playing:</h4>
                     <h2 id="title">{{ title }}</h2>
                 </div>
                 <div class="cd">
@@ -21,6 +31,7 @@
                         class="cd-thumb"
                         :style="{ backgroundImage: 'url(' + thumbnailM + ')' }"
                     ></div>
+                    <div class="playing-icon" v-if="isPlay"></div>
                 </div>
                 <div class="control">
                     <div
@@ -33,16 +44,14 @@
                     <div class="btn btn-prev" @click="prevSong">
                         <i class="fas fa-step-backward"></i>
                     </div>
-                    <div class="btn btn-toggle-play">
+                    <div class="btn btn-toggle-play" v-if="isPlay" @click="pause">
                         <i
                             class="fas fa-pause icon-pause"
-                            v-if="isPlay"
-                            @click="pause"
                         ></i>
+                    </div>
+                    <div class="btn btn-toggle-play" v-else @click="play">
                         <i
                             class="fas fa-play icon-play"
-                            v-else
-                            @click="play"
                         ></i>
                     </div>
                     <div class="btn btn-next" @click="nextSong">
@@ -71,7 +80,6 @@
                     <div>{{ totalTime }}</div>
                 </div>
 
-                <!-- <div class="lyric">{{ lyric }}</div> -->
                 <div class="lyric" v-html="lyric"></div>
 
                 <audio id="audio-control" controls v-show="false">
@@ -79,7 +87,7 @@
                 </audio>
             </div>
 
-            <div class="playlist">
+            <div class="playlist" :style="lyric ? 'margin-top: 502px' : 'margin-top: 486px'">
                 <div
                     v-for="(item, index) in songs"
                     :key="index"
@@ -104,12 +112,16 @@
                 </div>
             </div>
         </div>
+        <div class="lyric-right" v-if="true">
+            
+        </div>
     </div>
 </template>
 <script>
 import axios from "axios";
 export default {
     name: "Audio",
+
     data() {
         window.audio = this;
         return {
@@ -117,7 +129,7 @@ export default {
             songs: [],
             idSongActived: "",
             title: "",
-            urlThumb: "",
+            thumbnailM: "",
             isPlay: false,
             audioControl: null,
             cdThumbAnimate: null,
@@ -132,9 +144,10 @@ export default {
             lyric: "",
             timeStart: 0,
             word: "",
-            rowLyric: 0
+            rowLyric: -1
         };
     },
+
     methods: {
         /**
          * Thực hiện lấy bài hát
@@ -149,33 +162,31 @@ export default {
         },
 
         /**
-         * Thực hiện lấy chi tiết các danh sách
+         * TODO: Thực hiện lấy chi tiết các danh sách
          * Get Detail Playlist
          */
         async getDetailPlaylist() {
-            // const me = this;
+            let id = "ZWZB969E";
 
-            let res = await axios.get("/getDetailPlaylist");
-            // audio = document.getElementById("audio");
+            let res = await axios.get(`/getDetailPlaylist?id=${id}`);
 
             console.log(res);
         },
 
         /**
-         * Thực hiện lấy bài hát ở trang chủ
+         * TODO: Thực hiện lấy bài hát ở trang chủ
          * Get Home
          */
         async getHome() {
-            // const me = this;
+            let id = "1";
 
-            let res = await axios.get("/getHome");
-            // audio = document.getElementById("audio");
+            let res = await axios.get(`/getHome?id=${id}`);
 
             console.log(res);
         },
 
         /**
-         * Thực hiện lấy top 100
+         * TODO: Thực hiện lấy top 100
          * Get Top 100
          */
         async getTop100() {
@@ -195,10 +206,18 @@ export default {
          * Get Chart Home
          */
         async getChartHome() {
-            // const me = this;
+            const me = this;
 
             let res = await axios.get("/getChartHome");
-            // audio = document.getElementById("audio");
+
+            if (res && res.data && res.data.msg == "Success" && res.data.data) {
+                me.songs = res.data.data.RTChart.items;
+
+                if (me.songs.length > 0) {
+                    me.idSongActived = me.songs[0].encodeId;
+                    me.selectSong();
+                }
+            }
 
             console.log(res);
         },
@@ -255,17 +274,27 @@ export default {
                 me.sentences.old = res.data.data.sentences;
                 me.sentences.new = [];
                 me.lyric = '';
-                me.rowLyric = 0;
+                me.rowLyric = -1;
 
                 if(Array.isArray(me.sentences.old)) {
                     me.sentences.old.forEach(item => {
                         me.sentences.new.push({
                             startTime: item.words[0].startTime,
                             endTime: item.words[item.words.length - 1].endTime,
-                            data: item.words.map((x, index) => `<span id="word-${index}">${x.data}</span>`).join(" ")
+                            data: item.words.map((x, index) => `<span id="word-${index}">${x.data}</span>`).join(" "),
+                            dataSource: item.words.map(x => x.data).join(" ")
                         });
                     })
                 }
+
+                // Khi chọn bài mới thì scroll lời bên trái lên đầu
+                me.$nextTick(() => {
+                    let lyricLeftItem = document.getElementsByClassName("lyric-left-item");
+
+                    if(lyricLeftItem && lyricLeftItem.length > 0) {
+                        lyricLeftItem[0].scrollIntoView();
+                    }
+                })
             }
         },
 
@@ -289,7 +318,7 @@ export default {
         },
 
         /**
-         * Thực hiện lấy danh sách MV
+         * TODO: Thực hiện lấy danh sách MV
          * Get List MV
          */
         async getListMV() {
@@ -302,7 +331,7 @@ export default {
         },
 
         /**
-         * Thực hiện lấy danh mục MV
+         * TODO: Thực hiện lấy danh mục MV
          * Get Category MV
          */
         async getCategoryMV() {
@@ -315,7 +344,7 @@ export default {
         },
 
         /**
-         * Thực hiện lấy video MV
+         * TODO: Thực hiện lấy video MV
          * Get Video MV
          */
         async getVideo() {
@@ -498,6 +527,10 @@ export default {
                 me.title = song.title;
                 me.thumbnailM = song.thumbnailM;
                 me.totalTime = me.convertTime(song.duration);
+
+                // Thay đổi ảnh nền
+                document.getElementById("right-content").style.backgroundImage = `url(${song.thumbnailM})`;
+                document.getElementById("right-content").style.backgroundSize = '100% 100%';
             }
         },
 
@@ -570,7 +603,7 @@ export default {
          */
         scrollToActiveSong() {
             setTimeout(() => {
-                document.getElementsByClassName("song active")[0].scrollIntoView({
+                document.getElementsByClassName("playlist")[0].getElementsByClassName("song active")[0].scrollIntoView({
                     behavior: "smooth",
                     block: "nearest"
                 });
@@ -585,17 +618,20 @@ export default {
 
             if(Array.isArray(me.sentences.old)) {
                 // Xử lý lời ở cd
-                for(let i = me.rowLyric; i < me.sentences.new.length; i++) {
+                for(let i = me.rowLyric + 1; i < me.sentences.new.length; i++) {
                     let sentence = me.sentences.new[i];
                     let timeLyric = me.audioControl.currentTime * 1000;
                     if(timeLyric >= sentence.startTime && timeLyric <= sentence.endTime) {
                         me.lyric = sentence.data;
+                        if(i != me.rowLyric) {
+                            me.runLyricLeft(i);
+                        }
                         me.rowLyric = i;
                         break;
                     }
                 }
 
-                // Xử lý lời ở bên trái
+                // Xử lý từng chữ trong lời bài hát
                 let sentence = me.sentences.old[me.rowLyric];
                 if(sentence && Array.isArray(sentence.words)) {
                     for(let y = 0; y < sentence.words.length; y++) {
@@ -614,6 +650,30 @@ export default {
                         }
                     }
                 }
+            }
+        },
+
+        /**
+         * Chạy lời bài hát bên trái
+         */
+        runLyricLeft(rowIndex) {
+            const me = this;
+
+            let lyricLeftItem = document.getElementsByClassName('lyric-left-item');
+
+            if(lyricLeftItem && lyricLeftItem.length > 0) {
+                let lyricLeftItemActive = document.getElementsByClassName('lyric-left-item row-active');
+
+                if(lyricLeftItemActive && lyricLeftItemActive.length > 0) {
+                    lyricLeftItemActive[0].classList.add("is-over");
+                    lyricLeftItemActive[0].classList.remove("row-active");
+                }
+
+                lyricLeftItem[rowIndex ?? me.rowLyric].classList.add("row-active");
+                lyricLeftItem[rowIndex ?? me.rowLyric].scrollIntoView({
+                    behavior: "smooth",
+                    block: "center"
+                });
             }
         }
     },
@@ -636,6 +696,11 @@ export default {
 
         // Lắng nghe các event của control audio
         me.listenEvent();
+
+        // Thực hiện focus vào ô tìm kiếm
+        if(me.$refs && me.$refs.inputSearch) {
+            me.$refs.inputSearch.focus();
+        }
     },
 };
 </script>
@@ -673,6 +738,15 @@ export default {
     margin: 0 auto;
 }
 
+.overlay {
+    height: 85%;
+    width: 85%;
+    background-color: #291547;
+    opacity: 0.8;
+    backdrop-filter: blur(10px);
+    position: absolute;
+}
+
 /* DASHBOARD */
 .dashboard {
     padding: 16px 16px 14px;
@@ -689,15 +763,8 @@ export default {
     text-align: center;
 }
 
-.dashboard .header h4 {
-    color: red;
-    padding-top: 5px;
-    font-size: 12px;
-}
-
 .dashboard .header h2 {
-    margin: 0 auto;
-    margin: 10px 0;
+    margin-bottom: 10px;
     font-size: 20px;
 }
 
@@ -705,6 +772,7 @@ export default {
     display: flex;
     margin: auto;
     width: 200px;
+    position: relative;
 }
 
 .dashboard .cd .cd-thumb {
@@ -714,6 +782,16 @@ export default {
     background-color: #333;
     background-size: cover;
     margin: auto;
+}
+
+.playing-icon {
+    position: absolute;
+    top: calc(50% - 12px);
+    left: calc(50% - 12px);
+    height: 24px;
+    width: 24px;
+    background-size: cover;
+    background-image: url('https://zmp3-static.zmdcdn.me/skins/zmp3-v6.1/images/icons/icon-playing.gif');
 }
 
 /* CONTROL */
@@ -775,7 +853,6 @@ export default {
 
 /* PLAYLIST */
 .playlist {
-    margin-top: 530px;
     padding: 12px;
 }
 
@@ -835,5 +912,33 @@ export default {
 .lyric {
     margin-top: 10px;
     text-align: center;
+}
+
+/* LYRIC LEFT */
+.lyric-left {
+    position: fixed;
+    top: 120px;
+    height: 420px;
+    overflow: auto;
+    -webkit-mask-image: linear-gradient(180deg,hsla(0,0%,100%,0),hsla(0,0%,100%,.8) 10%,#fff 25%,#fff 75%,hsla(0,0%,100%,.8) 90%,hsla(0,0%,100%,0));
+    width: calc((85% - 480px)/2);
+}
+
+.lyric-left-item {
+    padding: 10px 0;
+    letter-spacing: -1px;
+    font-weight: 700;
+    font-size: inherit;
+    line-height: 1.2;
+    color: #fff;
+    font-size: 20px;
+}
+
+.row-active {
+    color: #ffed00;
+}
+
+.is-over {
+    color: hsla(0,0%,100%,.5);
 }
 </style>

@@ -21,8 +21,8 @@ app.get('/getSong', async (req, res) => {
  * Get Detail Playlist
  */
 app.get('/getDetailPlaylist', async (req, res) => {
-	var data = await ZingMp3.getDetailPlaylist("ZWZB969E");
-	res.status(200).send(data)
+	var data = await ZingMp3.getDetailPlaylist(req.query.id);
+	res.send(data)
 })
 
 /**
@@ -30,8 +30,8 @@ app.get('/getDetailPlaylist', async (req, res) => {
  * Get Home
  */
 app.get('/getHome', async (req, res) => {
-	var data = await ZingMp3.getHome("1");
-	res.status(200).send(data)
+	var data = await ZingMp3.getHome(req.query.id);
+	res.send(data)
 })
 
 /**
@@ -49,7 +49,7 @@ app.get('/getTop100', async (req, res) => {
  */
 app.get('/getChartHome', async (req, res) => {
 	var data = await ZingMp3.getChartHome();
-	res.status(200).send(data)
+	res.send(data)
 })
 
 /**

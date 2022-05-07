@@ -19,7 +19,7 @@ export default {
 <style lang="css" scoped>
 #right-content {
     width: 85%;
-    background-color: pink;
+    background-color: #291547;
     overflow: auto;
     overflow: overlay;
 }
